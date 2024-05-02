@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import minimist from 'minimist';
-import fs from 'fs-extra';
+import * as fs from 'fs';
 import axios, { AxiosRequestConfig } from 'axios';
 import * as path from 'path';
 
@@ -30,10 +30,9 @@ const backupDir = './backup';
 const axiosConfig: AxiosRequestConfig = {
   maxBodyLength: Infinity,
   baseURL: 'https://gitlab.com/api/v4/',
-  url: 'https://gitlab.com/api/v4/projects/idopterlabs%2Fwowlet%2Fwow-corporativo/secure_files',
   headers: { 
     'PRIVATE-TOKEN': gitlab_token,
-    'Content-Type': 'multipart/form-data'
+    // 'Content-Type': 'multipart/form-data'
   }
 };
 
@@ -71,7 +70,7 @@ const main = async () => {
     });
 
     console.log(`Download file ${secureFile.name} (${secureFile.id}) of ${repo_from}`)
-
+    
     await axios({
       ...axiosConfig,
       method: 'POST',
