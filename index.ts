@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import axios, { AxiosRequestConfig } from 'axios';
-import FormData from 'form-data';
+import * as FormData from 'form-data';
 import * as fs from 'fs';
 import minimist from 'minimist';
 import * as path from 'path';
@@ -17,15 +17,18 @@ const showHelp = () => {
     --token        Gitlab Token Access
     --from         Repository name to download files
     --to           Repository name to upload files
+    --download     Download files only (optional)
 
   Examples
     $ yarn start --token="12345" --from="tiagodanin/api-v1" --to="tiagodanin/backend"
+    $ yarn start --token="12345" --from="tiagodanin/api-v1" --download
 `);
 };
 
 const gitlab_token: string = argv?.token || '';
 const repo_from: string = argv?.from || '';
 const repo_to: string = argv?.to || '';
+const download_only: boolean = argv?.download || false;
 
 const backupDir = './backup';
 const axiosConfig: AxiosRequestConfig = {
@@ -56,49 +59,50 @@ const main = async () => {
       console.log(`Skipping: ${secureFile.name}`);
       continue;
     }
-  
+
     const filePath = path.join(backupDir, secureFile.name);
     const fileDir = path.dirname(filePath);
-  
-    // Garante que o diretório existe
+
     if (!fs.existsSync(fileDir)) {
       fs.mkdirSync(fileDir, { recursive: true });
     }
-  
+
     const fileWriter = fs.createWriteStream(filePath);
-  
+
     const response = await axios({
       ...axiosConfig,
       method: 'GET',
       responseType: 'stream',
       url: `/projects/${encodeURIComponent(repo_from)}/secure_files/${secureFile.id}/download`,
     });
-  
+
     const stream = response.data;
     stream.pipe(fileWriter);
-  
-    await new Promise((resolve, reject) => {
-      fileWriter.on('finish', resolve);
-      fileWriter.on('error', reject);
+
+    await new Promise<void>((resolve, reject) => {
+      fileWriter.on('finish', () => resolve());
+      fileWriter.on('error', () => reject());
     });
-  
+
     console.log(`Download file ${secureFile.name} (${secureFile.id}) of ${repo_from}`);
-  
-    // Verifica se o arquivo foi baixado corretamente
+
     if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-      console.error(`Erro: Arquivo ${filePath} está vazio ou não existe.`);
+      console.error(`Error: File ${filePath} is empty or does not exist.`);
       continue;
     }
-  
-    // Ajuste para garantir a extensão correta dos certificados
+
     const extension = path.extname(secureFile.name) || '.p12';
     const newFilePath = `${filePath}${extension}`;
     fs.renameSync(filePath, newFilePath);
-  
+
+    if (download_only) {
+      continue;
+    }
+
     const formData = new FormData();
     formData.append('name', secureFile.name);
     formData.append('file', fs.createReadStream(newFilePath));
-  
+
     try {
       await axios({
         ...axiosConfig,
@@ -112,14 +116,14 @@ const main = async () => {
       });
       console.log(`Upload file ${secureFile.name} (${secureFile.id}) in ${repo_to}`);
     } catch (error) {
-      console.error(`Erro ao fazer upload do arquivo ${secureFile.name}:`, error.response?.data || error.message);
+      console.error(`Error uploading file ${secureFile.name}:`, error.response?.data || error.message);
     }
   }
-  
+
   console.log('Done!');
 };
 
-if (gitlab_token && repo_from && repo_to) {
+if (gitlab_token && repo_from && (repo_to || download_only)) {
   main();
 } else {
   showHelp();
