@@ -55,11 +55,6 @@ const main = async () => {
   console.log(`Get lists of files (${secureFilesList.data.length})`);
 
   for (const secureFile of secureFilesList.data) {
-    if (!secureFile.name.match(/\.cer$|\.p12$/)) {
-      console.log(`Skipping: ${secureFile.name}`);
-      continue;
-    }
-
     const filePath = path.join(backupDir, secureFile.name);
     const fileDir = path.dirname(filePath);
 
@@ -91,11 +86,13 @@ const main = async () => {
       continue;
     }
 
-    const extension = path.extname(secureFile.name) || '.p12';
-    const newFilePath = `${filePath}${extension}`;
+    const newFilePath = `${filePath}`;
     fs.renameSync(filePath, newFilePath);
 
     if (download_only) {
+      continue;
+    } else if (!secureFile.name.match(/\.cer$|\.p12$/)) {
+      console.log(`Skipping: ${secureFile.name}`);
       continue;
     }
 
